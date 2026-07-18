@@ -150,12 +150,12 @@ def load_data():
 
     if df.empty:
         tasks = [
-            ("💪 Ab roller & core training", "💪 Fitness", "⭐ Medium"),
+            ("💪 core training", "💪 Fitness", "⭐ Medium"),
             ("🏋️ Goblet squats", "💪 Fitness", "⭐ Medium"),
             ("🥩 Track daily protein intake", "🥗 Nutrition", "🔥 High"),
-            ("🍱 Prep chicken, rice, and peas", "🥗 Nutrition", "🔥 High"),
-            ("💻 Review Python/PySpark notes", "💻 Learning", "⭐ Medium"),
-            ("📦 Sort living room boxes", "🏠 Home", "🌙 Low"),
+            ("🍱 Eating all Meals in a day", "🥗 Nutrition", "🔥 High"),
+            ("💻 SQL, C/AL-AL", "💻 Learning", "⭐ Medium"),
+            ("📦 Sort living room ", "🏠 Home", "🌙 Low"),
         ]
         df = pd.DataFrame({
             "Task": [t[0] for t in tasks],
@@ -202,14 +202,32 @@ def load_data():
     return df
 
 
+def persist_tasks(df, rerun=True, success_msg=None):
+    """Write-through save: the session's copy updates immediately, so the UI never
+    has to re-read the sheet just to reflect a change you just made — that re-read
+    on every single click was what blew through Google's 60-requests/minute quota.
+    The write to Sheets is best-effort: if it's rate-limited we don't crash, we just
+    keep the change for this session and let the user know."""
+    st.session_state.tasks_df = df
+    try:
+        conn.update(data=df)
+    except Exception:
+        st.toast("⚠️ Google Sheets is rate-limited — your change is kept for this session and will sync on the next successful save.", icon="⚠️")
+    if success_msg:
+        st.success(success_msg)
+    if rerun:
+        st.rerun()
+
+
+# Load from Sheets at most once per browser session — not on every rerun/click —
+# which is what actually keeps requests under Google's per-minute quota.
 try:
-    df = load_data()
-    st.session_state["last_good_df"] = df
+    if "tasks_df" not in st.session_state:
+        st.session_state.tasks_df = load_data()
+    df = st.session_state.tasks_df
 except Exception:
-    # Most likely a transient Google Sheets rate limit (429) — fall back to the
-    # last successfully loaded data instead of crashing the whole app.
-    if "last_good_df" in st.session_state:
-        df = st.session_state["last_good_df"]
+    if "tasks_df" in st.session_state:
+        df = st.session_state.tasks_df
         st.warning("⏳ Google Sheets is briefly rate-limited — showing the last loaded data. It'll refresh in a few seconds.")
     else:
         st.error("⏳ Google Sheets is rate-limited right now (too many requests in the last minute). Please wait a few seconds and refresh the page.")
@@ -224,6 +242,11 @@ st.sidebar.metric(label="🗓️ Days Until Move", value=days_left)
 
 best_streak = int(df['Streak'].max()) if not df.empty else 0
 st.sidebar.metric(label="Best Active Streak", value=f"{best_streak}d {streak_badge(best_streak)}")
+
+if st.sidebar.button("🔄 Sync from Sheet"):
+    st.session_state.pop("tasks_df", None)
+    st.cache_data.clear()
+    st.rerun()
 
 st.sidebar.divider()
 page = st.sidebar.radio("Navigation", ["📝 Daily Checklist", "📊 Analytics", "⚙️ Manage Tasks"])
@@ -271,9 +294,7 @@ if page == "📝 Daily Checklist":
                     st.toast(random.choice(CHEER_MESSAGES))
 
     if updated:
-        conn.update(data=df)
-        st.cache_data.clear()
-        st.rerun()
+        persist_tasks(df)
 
     st.divider()
     st.write("### ➕ Add a Task")
@@ -293,9 +314,7 @@ if page == "📝 Daily Checklist":
                 "Streak": [0], "LastCompletedDate": [""],
             })
             df = pd.concat([df, new_row], ignore_index=True)
-            conn.update(data=df)
-            st.cache_data.clear()
-            st.rerun()
+            persist_tasks(df)
 
 # --- 5. Page: Analytics ---
 elif page == "📊 Analytics":
@@ -390,10 +409,7 @@ elif page == "⚙️ Manage Tasks":
         df["Task"] = edited["Task"]
         df["Category"] = edited["Category"]
         df["Priority"] = edited["Priority"]
-        conn.update(data=df)
-        st.cache_data.clear()
-        st.success("Changes saved!")
-        st.rerun()
+        persist_tasks(df, success_msg="Changes saved!")
 
     st.divider()
     st.write("#### 🗑️ Delete Tasks")
@@ -404,9 +420,6 @@ elif page == "⚙️ Manage Tasks":
         if tasks_to_delete:
             # Filters the dataframe to keep only the tasks NOT in the deletion list
             df = df[~df['Task'].isin(tasks_to_delete)].reset_index(drop=True)
-            conn.update(data=df)
-            st.cache_data.clear()
-            st.success("Tasks removed successfully!")
-            st.rerun()
+            persist_tasks(df, success_msg="Tasks removed successfully!")
         else:
             st.warning("Please select at least one task to delete.")
