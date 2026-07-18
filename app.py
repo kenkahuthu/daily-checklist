@@ -123,7 +123,7 @@ def _ensure_task_columns(df: pd.DataFrame) -> pd.DataFrame:
 def load_history():
     """Reads the 'History' worksheet (daily completion log), creating it if missing."""
     try:
-        hist = conn.read(worksheet="History", ttl=0)
+        hist = conn.read(worksheet="History", ttl=20)  # history changes once/day, cache longer
         if hist.empty:
             hist = pd.DataFrame(columns=HISTORY_COLS)
     except Exception:
@@ -146,7 +146,7 @@ def save_history(hist_df):
 
 
 def load_data():
-    df = conn.read(ttl=0)
+    df = conn.read(ttl=5)  # short cache: avoids a fresh API read on every single rerun
 
     if df.empty:
         tasks = [
@@ -202,7 +202,18 @@ def load_data():
     return df
 
 
-df = load_data()
+try:
+    df = load_data()
+    st.session_state["last_good_df"] = df
+except Exception:
+    # Most likely a transient Google Sheets rate limit (429) — fall back to the
+    # last successfully loaded data instead of crashing the whole app.
+    if "last_good_df" in st.session_state:
+        df = st.session_state["last_good_df"]
+        st.warning("⏳ Google Sheets is briefly rate-limited — showing the last loaded data. It'll refresh in a few seconds.")
+    else:
+        st.error("⏳ Google Sheets is rate-limited right now (too many requests in the last minute). Please wait a few seconds and refresh the page.")
+        st.stop()
 
 # --- 3. Sidebar Navigation & Global Metrics ---
 st.sidebar.title("✨ Routine Hub")
