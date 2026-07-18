@@ -11,7 +11,6 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 def load_data():
     df = conn.read(ttl=0)
     
-    # Inject default tasks if the sheet is completely empty
     if df.empty:
         tasks = [
             "Ab roller & core training",
@@ -63,14 +62,31 @@ if progress_pct == 100 and total_tasks > 0:
 
 st.divider()
 
-# 4. Render Checkboxes
+# 4. Render Checkboxes & Delete Buttons
 updated = False
-for index, row in df.iterrows():
-    checked = st.checkbox(row['Task'], value=row['Completed'], key=f"task_{index}")
-    if checked != row['Completed']:
-        df.at[index, 'Completed'] = checked
-        updated = True
+tasks_to_delete = []
 
+for index, row in df.iterrows():
+    # Split the row: 90% for the checkbox, 10% for the delete button
+    task_col, del_col = st.columns([9, 1])
+    
+    with task_col:
+        checked = st.checkbox(row['Task'], value=row['Completed'], key=f"task_{index}")
+        if checked != row['Completed']:
+            df.at[index, 'Completed'] = checked
+            updated = True
+            
+    with del_col:
+        # If the user clicks the X, flag this row's index for deletion
+        if st.button("❌", key=f"del_{index}"):
+            tasks_to_delete.append(index)
+
+# If any delete buttons were clicked, drop those rows and reset the index
+if tasks_to_delete:
+    df = df.drop(tasks_to_delete).reset_index(drop=True)
+    updated = True
+
+# Save changes to Google Sheets and refresh the page
 if updated:
     conn.update(data=df)
     st.cache_data.clear()
