@@ -107,6 +107,46 @@ def streak_badge(n: int) -> str:
     return ""
 
 
+# --- Reward game: unlocked once today's checklist hits 100% ---
+WORDLE_WORDS = ["FOCUS", "HABIT", "BOOST", "SWEAT", "CLEAN", "STUDY", "EARLY",
+                "FRESH", "SPARK", "DAILY", "GRIND", "WORTH", "SMART", "BUILD", "PRIDE"]
+SCRAMBLE_WORDS = ["EXERCISE", "PROTEIN", "STREAK", "CHECKLIST", "MOTIVATION", "DISCIPLINE",
+                   "HYDRATE", "PLANNER", "CONSISTENCY", "MINDSET", "PROGRESS", "BALANCE", "ROUTINE"]
+
+
+def daily_word(pool):
+    """Same word for everyone all day (like real Wordle) — resets at midnight."""
+    return pool[date.today().toordinal() % len(pool)]
+
+
+def score_guess(guess: str, target: str):
+    """Wordle-style scoring: 'correct' / 'present' / 'absent' per letter."""
+    result = ["absent"] * len(target)
+    target_chars = list(target)
+    for i, ch in enumerate(guess):
+        if i < len(target_chars) and ch == target_chars[i]:
+            result[i] = "correct"
+            target_chars[i] = None
+    for i, ch in enumerate(guess):
+        if result[i] == "correct":
+            continue
+        if ch in target_chars:
+            result[i] = "present"
+            target_chars[target_chars.index(ch)] = None
+    return result
+
+
+def render_wordle_row(guess: str, statuses: list):
+    colors = {"correct": "#6BCB77", "present": "#FFD93D", "absent": "#B0B0B0"}
+    cells = "".join(
+        f"<span style='display:inline-block; width:44px; height:44px; line-height:44px; "
+        f"text-align:center; margin:2px; border-radius:8px; font-weight:700; font-size:20px; "
+        f"color:white; background:{colors[s]};'>{ch}</span>"
+        for ch, s in zip(guess, statuses)
+    )
+    st.markdown(f"<div>{cells}</div>", unsafe_allow_html=True)
+
+
 # --- 2. Database Connection & Load ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -150,12 +190,12 @@ def load_data():
 
     if df.empty:
         tasks = [
-            ("💪 core training", "💪 Fitness", "⭐ Medium"),
+            ("💪 Ab roller & core training", "💪 Fitness", "⭐ Medium"),
             ("🏋️ Goblet squats", "💪 Fitness", "⭐ Medium"),
             ("🥩 Track daily protein intake", "🥗 Nutrition", "🔥 High"),
-            ("🍱 Eating all Meals in a day", "🥗 Nutrition", "🔥 High"),
-            ("💻 SQL, C/AL-AL", "💻 Learning", "⭐ Medium"),
-            ("📦 Sort living room ", "🏠 Home", "🌙 Low"),
+            ("🍱 Prep chicken, rice, and peas", "🥗 Nutrition", "🔥 High"),
+            ("💻 Review Python/PySpark notes", "💻 Learning", "⭐ Medium"),
+            ("📦 Sort living room boxes", "🏠 Home", "🌙 Low"),
         ]
         df = pd.DataFrame({
             "Task": [t[0] for t in tasks],
@@ -249,7 +289,7 @@ if st.sidebar.button("🔄 Sync from Sheet"):
     st.rerun()
 
 st.sidebar.divider()
-page = st.sidebar.radio("Navigation", ["📝 Daily Checklist", "📊 Analytics", "⚙️ Manage Tasks"])
+page = st.sidebar.radio("Navigation", ["📝 Daily Checklist", "📊 Analytics", "⚙️ Manage Tasks", "🎮 Reward Game"])
 
 # --- 4. Page: Daily Checklist ---
 if page == "📝 Daily Checklist":
@@ -423,3 +463,84 @@ elif page == "⚙️ Manage Tasks":
             persist_tasks(df, success_msg="Tasks removed successfully!")
         else:
             st.warning("Please select at least one task to delete.")
+
+
+# --- 7. Page: Reward Game (unlocked at 100% daily completion) ---
+elif page == "🎮 Reward Game":
+    completed_count = int(df['Completed'].sum())
+    total_tasks = len(df)
+    progress_pct = int((completed_count / total_tasks) * 100) if total_tasks > 0 else 0
+
+    if progress_pct < 100:
+        st.title("🔒 Reward Game")
+        st.write("Finish every task on today's checklist to unlock a quick word game!")
+        st.progress(progress_pct, text=f"{progress_pct}% complete — {total_tasks - completed_count} task(s) to go")
+    else:
+        st.title("🎉 All Done — Play!")
+        st.write("Nice work finishing today's checklist. Pick a game:")
+        tab1, tab2 = st.tabs(["🟩 Wordle", "🔀 Word Scramble"])
+
+        # --- Wordle ---
+        with tab1:
+            target = daily_word(WORDLE_WORDS)
+            if st.session_state.get("wordle_target") != target:
+                st.session_state.wordle_target = target
+                st.session_state.wordle_guesses = []
+                st.session_state.wordle_won = False
+
+            for g in st.session_state.wordle_guesses:
+                render_wordle_row(g, score_guess(g, target))
+
+            if not st.session_state.wordle_won and len(st.session_state.wordle_guesses) < 6:
+                with st.form("wordle_form", clear_on_submit=True):
+                    guess = st.text_input(f"Guess the {len(target)}-letter word:", max_chars=len(target))
+                    go = st.form_submit_button("Guess")
+                    if go:
+                        guess = guess.upper().strip()
+                        if len(guess) != len(target) or not guess.isalpha():
+                            st.warning(f"Enter a {len(target)}-letter word.")
+                        else:
+                            st.session_state.wordle_guesses.append(guess)
+                            if guess == target:
+                                st.session_state.wordle_won = True
+                            st.rerun()
+
+            if st.session_state.wordle_won:
+                st.success(f"🎉 You got it — **{target}**!")
+                st.balloons()
+            elif len(st.session_state.wordle_guesses) >= 6:
+                st.error(f"Out of guesses! The word was **{target}**.")
+
+        # --- Word Scramble ---
+        with tab2:
+            s_target = daily_word(SCRAMBLE_WORDS)
+            if st.session_state.get("scramble_target") != s_target:
+                st.session_state.scramble_target = s_target
+                letters = list(s_target)
+                random.shuffle(letters)
+                while "".join(letters) == s_target and len(set(s_target)) > 1:
+                    random.shuffle(letters)
+                st.session_state.scramble_display = "".join(letters)
+                st.session_state.scramble_solved = False
+                st.session_state.scramble_tries = 0
+
+            st.markdown(
+                f"<h2 style='letter-spacing:6px; text-align:center;'>{st.session_state.scramble_display}</h2>",
+                unsafe_allow_html=True,
+            )
+
+            if not st.session_state.scramble_solved:
+                with st.form("scramble_form", clear_on_submit=True):
+                    answer = st.text_input("Unscramble it:")
+                    submit = st.form_submit_button("Submit")
+                    if submit:
+                        st.session_state.scramble_tries += 1
+                        if answer.upper().strip() == s_target:
+                            st.session_state.scramble_solved = True
+                        else:
+                            st.warning("Not quite — try again!")
+                if st.button("💡 Hint (reveal first letter)"):
+                    st.info(f"Starts with **{s_target[0]}**")
+            else:
+                st.success(f"🎉 Solved in {st.session_state.scramble_tries} tries — it was **{s_target}**!")
+                st.balloons()
