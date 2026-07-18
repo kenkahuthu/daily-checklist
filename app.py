@@ -16,17 +16,35 @@ st.markdown("""
 html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
 h1, h2, h3 { font-family: 'Baloo 2', cursive; }
 
-/* App background: a colorful gradient tint over a real daily-routine style photo
+/* App background: the photo lives on a fixed ::before layer behind everything,
+   heavily tinted + softened so it reads as texture, never competes with text.
    (flat-lay planner + coffee + laptop, free to use under the Unsplash License,
    photo by Sincerely Media: https://unsplash.com/photos/EhU_E_0s3wE) */
-.stApp {
+.stApp { position: relative; }
+.stApp::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
     background-image:
-        linear-gradient(135deg, rgba(253,235,113,0.55) 0%, rgba(255,234,167,0.55) 20%, rgba(250,178,255,0.55) 60%, rgba(160,231,229,0.55) 100%),
+        linear-gradient(135deg, rgba(253,235,113,0.82) 0%, rgba(255,234,167,0.82) 20%, rgba(250,178,255,0.82) 60%, rgba(160,231,229,0.82) 100%),
         url('https://images.unsplash.com/photo-1546352214-9148ef4d8c9c?fm=jpg&q=80&w=1920&auto=format&fit=crop');
     background-size: cover;
     background-position: center;
-    background-attachment: fixed;
     background-repeat: no-repeat;
+    filter: saturate(0.8) brightness(1.05) blur(1px);
+}
+
+/* Frosted panel behind all page content — guarantees text is legible no
+   matter how busy the photo underneath is. */
+.block-container {
+    background: rgba(255, 255, 255, 0.90);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-radius: 24px;
+    padding: 2rem 2.2rem !important;
+    margin-top: 1rem;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15);
 }
 
 /* Sidebar */
