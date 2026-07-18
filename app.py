@@ -16,25 +16,11 @@ st.markdown("""
 html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
 h1, h2, h3 { font-family: 'Baloo 2', cursive; }
 
-/* App background: colorful gradient tint (much stronger now) over a real
-   daily-routine style photo, so it reads as soft texture, not a busy photo
-   competing with text. (flat-lay planner + coffee + laptop, free to use
-   under the Unsplash License, photo by Sincerely Media:
-   https://unsplash.com/photos/EhU_E_0s3wE) */
+/* App background: A clean, soft gradient for maximum readability */
 .stApp {
-    background-image:
-        linear-gradient(135deg, rgba(253,235,113,0.88) 0%, rgba(255,234,167,0.88) 20%, rgba(250,178,255,0.88) 60%, rgba(160,231,229,0.88) 100%),
-        url('https://images.unsplash.com/photo-1546352214-9148ef4d8c9c?fm=jpg&q=80&w=1920&auto=format&fit=crop');
-    background-size: cover;
-    background-position: center;
+    background-color: #F0F4F8;
+    background-image: radial-gradient(circle at 50% 0%, #FFFFFF 0%, #F0F4F8 80%);
     background-attachment: fixed;
-    background-repeat: no-repeat;
-}
-
-/* Give body text outside of cards (titles, captions, labels) a touch of
-   contrast against the background without needing any extra wrapper panel. */
-h1, h2, h3, h4, p, label, .stMarkdown {
-    text-shadow: 0 1px 3px rgba(255,255,255,0.6);
 }
 
 /* Sidebar */
@@ -43,19 +29,19 @@ section[data-testid="stSidebar"] {
 }
 section[data-testid="stSidebar"] * { color: #FFFFFF !important; }
 
-/* Card containers -> every st.container(border=True) becomes a soft floating card */
+/* Card containers -> Solid white backgrounds to make text pop */
 div[data-testid="stVerticalBlockBorderWrapper"] {
-    background: rgba(255,255,255,0.88);
+    background: #FFFFFF;
     border-radius: 18px !important;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
-    padding: 4px 10px;
-    margin-bottom: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+    padding: 8px 12px;
+    margin-bottom: 12px;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
-    border: none !important;
+    border: 1px solid #E2E8F0 !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-    transform: translateY(-2px) scale(1.01);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.18);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
 }
 
 /* Metrics */
@@ -301,8 +287,19 @@ page = st.sidebar.radio("Navigation", ["📝 Daily Checklist", "📊 Analytics",
 
 # --- 4. Page: Daily Checklist ---
 if page == "📝 Daily Checklist":
-    st.title("Today's Action Plan 🎯")
-    st.write(f"**{date.today().strftime('%A, %B %d')}**")
+    from datetime import datetime
+    
+    # Create a dynamic greeting based on the hour
+    current_hour = datetime.now().hour
+    if current_hour < 12:
+        greeting = "Good Morning! ☀️"
+    elif 12 <= current_hour < 18:
+        greeting = "Good Afternoon! ☕"
+    else:
+        greeting = "Good Evening! 🌙"
+
+    st.markdown(f"<h1 style='text-align: center; color: #2D3748;'>{greeting}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h4 style='text-align: center; color: #718096; margin-bottom: 30px;'>{date.today().strftime('%A, %B %d')}</h4>", unsafe_allow_html=True)
 
     completed_count = int(df['Completed'].sum())
     total_tasks = len(df)
