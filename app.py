@@ -2,76 +2,135 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 import random
+import base64
+import os
 from datetime import date
 from streamlit_gsheets import GSheetsConnection
 
 # 'layout="centered"' keeps the UI tight and readable on both phones and monitors
 st.set_page_config(page_title="Daily Routine", page_icon="✨", layout="centered")
 
-# --- 0. Look & Feel: colorful, card-based, playful UI ---
+# --- 0.1 Inject Local Background Image ---
+def set_bg_from_local(image_file):
+    """Reads a local image and injects it into the CSS as a base64 background."""
+    if os.path.exists(image_file):
+        with open(image_file, "rb") as f:
+            encoded_string = base64.b64encode(f.read()).decode()
+        st.markdown(
+            f"""
+            <style>
+            .stApp {{
+                background-image: url(data:image/jpeg;base64,{encoded_string});
+                background-size: cover;
+                background-position: center;
+                background-attachment: fixed;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+# Looks for the newly uploaded prism.jpg file on GitHub
+set_bg_from_local("prism.jpg")
+
+# --- 0.2 Look & Feel: Dark/Neon Glassmorphism UI (Larger Fonts) ---
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&family=Poppins:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Poppins:wght@400;600&display=swap');
 
-html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
-h1, h2, h3 { font-family: 'Baloo 2', cursive; }
-
-/* App background: A clean, soft gradient for maximum readability */
-.stApp {
-    background-color: #F0F4F8;
-    background-image: radial-gradient(circle at 50% 0%, #FFFFFF 0%, #F0F4F8 80%);
-    background-attachment: fixed;
+/* Bumped up the base font size for the whole app */
+html, body, [class*="css"] { 
+    font-family: 'Poppins', sans-serif; 
+    color: #E2E8F0 !important; 
+    font-size: 18px !important; 
 }
 
-/* Sidebar */
+/* Headers get a futuristic font, neon glow, and larger sizes */
+h1, h2, h3, h4, h5, h6 { 
+    font-family: 'Orbitron', sans-serif !important; 
+    color: #00D4FF !important; 
+    text-shadow: 0 0 10px rgba(0, 212, 255, 0.4); 
+}
+h1 { font-size: 2.6rem !important; }
+h2 { font-size: 2.2rem !important; }
+h3 { font-size: 1.8rem !important; }
+h4 { font-size: 1.5rem !important; }
+
+/* Ensure standard text and checkboxes are larger and crisp white */
+p, label, .stMarkdown, .stCheckbox span { 
+    color: #FFFFFF !important; 
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    font-size: 18px !important; 
+}
+
+/* Sidebar styling */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #6C5CE7 0%, #8E7CFB 100%);
+    background-color: rgba(5, 10, 20, 0.85) !important;
+    backdrop-filter: blur(10px);
+    border-right: 1px solid rgba(0, 212, 255, 0.2);
 }
-section[data-testid="stSidebar"] * { color: #FFFFFF !important; }
 
-/* Card containers -> Solid white backgrounds to make text pop */
+/* Floating Dark Cards */
 div[data-testid="stVerticalBlockBorderWrapper"] {
-    background: #FFFFFF;
+    background: rgba(15, 20, 30, 0.75) !important;
+    backdrop-filter: blur(10px);
     border-radius: 18px !important;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.06);
-    padding: 8px 12px;
-    margin-bottom: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    padding: 12px 16px;
+    margin-bottom: 16px;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
-    border: 1px solid #E2E8F0 !important;
+    border: 1px solid rgba(0, 212, 255, 0.25) !important;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    box-shadow: 0 8px 20px rgba(0, 212, 255, 0.15);
+    border: 1px solid rgba(0, 212, 255, 0.6) !important;
 }
 
-/* Metrics */
+/* Metrics Dashboard Cards */
 div[data-testid="stMetric"] {
-    background: rgba(255,255,255,0.85);
+    background: rgba(15, 20, 30, 0.75) !important;
+    backdrop-filter: blur(8px);
     border-radius: 16px;
-    padding: 10px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.10);
+    padding: 12px;
+    border: 1px solid rgba(0, 212, 255, 0.25);
+}
+/* Larger metric numbers */
+div[data-testid="stMetricValue"] { 
+    color: #00D4FF !important; 
+    font-size: 2.2rem !important;
 }
 
-/* Animated shimmering progress bar */
+/* Animated glowing progress bar */
 .stProgress > div > div > div {
-    background-image: linear-gradient(90deg, #FF6B6B, #FFD93D, #6BCB77, #4D96FF);
-    background-size: 300% 100%;
-    animation: shimmer 3s linear infinite;
+    background-image: linear-gradient(90deg, #0055FF, #00D4FF, #0055FF);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
     border-radius: 20px;
+    height: 12px; /* Slightly thicker progress bar */
 }
 @keyframes shimmer {
-    0% { background-position: 0% 50%; }
-    100% { background-position: 300% 50%; }
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
 }
 
 /* Buttons */
 .stButton > button {
     border-radius: 999px;
-    border: none;
+    border: 1px solid #00D4FF;
+    background: rgba(0, 212, 255, 0.1);
+    color: #00D4FF !important;
     font-weight: 600;
-    transition: transform 0.15s ease;
+    font-size: 16px !important;
+    padding: 10px 24px;
+    transition: all 0.2s ease;
 }
-.stButton > button:hover { transform: scale(1.04); }
+.stButton > button:hover { 
+    transform: scale(1.04); 
+    background: #00D4FF;
+    color: #000000 !important;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -79,9 +138,9 @@ div[data-testid="stMetric"] {
 CATEGORIES = {
     "💪 Fitness":   "#FF6B6B",
     "🥗 Nutrition": "#4ECDC4",
-    "💻 Learning":  "#845EC2",
-    "🏠 Home":      "#FFC75F",
-    "✨ Other":     "#00C2A8",
+    "💻 Learning":  "#A78BFA",
+    "🏠 Home":      "#FBBF24",
+    "✨ Other":     "#00D4FF",
 }
 PRIORITIES = {"🔥 High": 3, "⭐ Medium": 2, "🌙 Low": 1}
 CHEER_MESSAGES = [
@@ -91,7 +150,6 @@ CHEER_MESSAGES = [
 TASK_COLS = ["Task", "Category", "Priority", "Completed", "Date", "Streak", "LastCompletedDate"]
 HISTORY_COLS = ["Date", "Completed", "Total", "Pct"]
 
-
 def streak_badge(n: int) -> str:
     if n >= 30: return "👑"
     if n >= 14: return "🏆"
@@ -100,21 +158,16 @@ def streak_badge(n: int) -> str:
     if n >= 1:  return "✨"
     return ""
 
-
-# --- Reward game: unlocked once today's checklist hits 100% ---
+# --- Reward game ---
 WORDLE_WORDS = ["FOCUS", "HABIT", "BOOST", "SWEAT", "CLEAN", "STUDY", "EARLY",
                 "FRESH", "SPARK", "DAILY", "GRIND", "WORTH", "SMART", "BUILD", "PRIDE"]
 SCRAMBLE_WORDS = ["EXERCISE", "PROTEIN", "STREAK", "CHECKLIST", "MOTIVATION", "DISCIPLINE",
                    "HYDRATE", "PLANNER", "CONSISTENCY", "MINDSET", "PROGRESS", "BALANCE", "ROUTINE"]
 
-
 def daily_word(pool):
-    """Same word for everyone all day (like real Wordle) — resets at midnight."""
     return pool[date.today().toordinal() % len(pool)]
 
-
 def score_guess(guess: str, target: str):
-    """Wordle-style scoring: 'correct' / 'present' / 'absent' per letter."""
     result = ["absent"] * len(target)
     target_chars = list(target)
     for i, ch in enumerate(guess):
@@ -129,35 +182,29 @@ def score_guess(guess: str, target: str):
             target_chars[target_chars.index(ch)] = None
     return result
 
-
 def render_wordle_row(guess: str, statuses: list):
-    colors = {"correct": "#6BCB77", "present": "#FFD93D", "absent": "#B0B0B0"}
+    colors = {"correct": "#4ECDC4", "present": "#FBBF24", "absent": "#334155"}
     cells = "".join(
-        f"<span style='display:inline-block; width:44px; height:44px; line-height:44px; "
-        f"text-align:center; margin:2px; border-radius:8px; font-weight:700; font-size:20px; "
-        f"color:white; background:{colors[s]};'>{ch}</span>"
+        f"<span style='display:inline-block; width:50px; height:50px; line-height:50px; "
+        f"text-align:center; margin:3px; border-radius:10px; font-weight:700; font-size:24px; "
+        f"color:white; background:{colors[s]}; border: 1px solid rgba(255,255,255,0.1);'>{ch}</span>"
         for ch, s in zip(guess, statuses)
     )
     st.markdown(f"<div>{cells}</div>", unsafe_allow_html=True)
 
-
 # --- 2. Database Connection & Load ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-
 def _ensure_task_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Backfills any new columns (Category/Priority/Streak/etc.) onto older sheets."""
     defaults = {"Category": "✨ Other", "Priority": "⭐ Medium", "Streak": 0, "LastCompletedDate": ""}
     for col in TASK_COLS:
         if col not in df.columns:
             df[col] = defaults.get(col, "")
     return df[TASK_COLS]
 
-
 def load_history():
-    """Reads the 'History' worksheet (daily completion log), creating it if missing."""
     try:
-        hist = conn.read(worksheet="History", ttl=20)  # history changes once/day, cache longer
+        hist = conn.read(worksheet="History", ttl=20) 
         if hist.empty:
             hist = pd.DataFrame(columns=HISTORY_COLS)
     except Exception:
@@ -165,9 +212,8 @@ def load_history():
         try:
             conn.create(worksheet="History", data=hist)
         except Exception:
-            pass  # tab may need to be created manually if the connection lacks permission
+            pass 
     return hist
-
 
 def save_history(hist_df):
     try:
@@ -178,10 +224,8 @@ def save_history(hist_df):
         except Exception:
             pass
 
-
 def load_data():
-    df = conn.read(ttl=5)  # short cache: avoids a fresh API read on every single rerun
-
+    df = conn.read(ttl=5) 
     if df.empty:
         tasks = [
             ("💪 Ab roller & core training", "💪 Fitness", "⭐ Medium"),
@@ -205,11 +249,9 @@ def load_data():
         return df
 
     df = _ensure_task_columns(df)
-    # Force Boolean formatting to prevent pandas crashes
     df['Completed'] = df['Completed'].astype(str).str.upper() == 'TRUE'
     df['Streak'] = pd.to_numeric(df['Streak'], errors="coerce").fillna(0).astype(int)
 
-    # --- The Daily Reset Logic, now with streak tracking + history logging ---
     if str(df['Date'].iloc[0]) != str(date.today()):
         prev_date = str(df['Date'].iloc[0])
         completed_yesterday = int(df['Completed'].sum())
@@ -222,7 +264,6 @@ def load_data():
         }])], ignore_index=True)
         save_history(hist)
 
-        # Streak = consecutive days completed; resets to 0 the moment a task is missed
         df['LastCompletedDate'] = df.apply(
             lambda r: prev_date if r['Completed'] else r['LastCompletedDate'], axis=1
         )
@@ -235,26 +276,17 @@ def load_data():
 
     return df
 
-
 def persist_tasks(df, rerun=True, success_msg=None):
-    """Write-through save: the session's copy updates immediately, so the UI never
-    has to re-read the sheet just to reflect a change you just made — that re-read
-    on every single click was what blew through Google's 60-requests/minute quota.
-    The write to Sheets is best-effort: if it's rate-limited we don't crash, we just
-    keep the change for this session and let the user know."""
     st.session_state.tasks_df = df
     try:
         conn.update(data=df)
     except Exception:
-        st.toast("⚠️ Google Sheets is rate-limited — your change is kept for this session and will sync on the next successful save.", icon="⚠️")
+        st.toast("⚠️ Google Sheets is rate-limited — your change is kept for this session.", icon="⚠️")
     if success_msg:
         st.success(success_msg)
     if rerun:
         st.rerun()
 
-
-# Load from Sheets at most once per browser session — not on every rerun/click —
-# which is what actually keeps requests under Google's per-minute quota.
 try:
     if "tasks_df" not in st.session_state:
         st.session_state.tasks_df = load_data()
@@ -262,9 +294,9 @@ try:
 except Exception:
     if "tasks_df" in st.session_state:
         df = st.session_state.tasks_df
-        st.warning("⏳ Google Sheets is briefly rate-limited — showing the last loaded data. It'll refresh in a few seconds.")
+        st.warning("⏳ Google Sheets is briefly rate-limited — showing the last loaded data.")
     else:
-        st.error("⏳ Google Sheets is rate-limited right now (too many requests in the last minute). Please wait a few seconds and refresh the page.")
+        st.error("⏳ Google Sheets is rate-limited right now. Please wait a few seconds and refresh.")
         st.stop()
 
 # --- 3. Sidebar Navigation & Global Metrics ---
@@ -289,7 +321,6 @@ page = st.sidebar.radio("Navigation", ["📝 Daily Checklist", "📊 Analytics",
 if page == "📝 Daily Checklist":
     from datetime import datetime
     
-    # Create a dynamic greeting based on the hour
     current_hour = datetime.now().hour
     if current_hour < 12:
         greeting = "Good Morning! ☀️"
@@ -298,8 +329,8 @@ if page == "📝 Daily Checklist":
     else:
         greeting = "Good Evening! 🌙"
 
-    st.markdown(f"<h1 style='text-align: center; color: #2D3748;'>{greeting}</h1>", unsafe_allow_html=True)
-    st.markdown(f"<h4 style='text-align: center; color: #718096; margin-bottom: 30px;'>{date.today().strftime('%A, %B %d')}</h4>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align: center;'>{greeting}</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h4 style='text-align: center; color: #94A3B8; margin-bottom: 30px;'>{date.today().strftime('%A, %B %d')}</h4>", unsafe_allow_html=True)
 
     completed_count = int(df['Completed'].sum())
     total_tasks = len(df)
@@ -312,12 +343,11 @@ if page == "📝 Daily Checklist":
     st.divider()
     updated = False
 
-    # Tasks are grouped into colorful category sections, each rendered as a card
     for cat, color in CATEGORIES.items():
         cat_tasks = df[df['Category'] == cat]
         if cat_tasks.empty:
             continue
-        st.markdown(f"<h4 style='color:{color}; margin-bottom:4px;'>{cat}</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color:{color}; margin-bottom:10px;'>{cat}</h3>", unsafe_allow_html=True)
 
         for index, row in cat_tasks.iterrows():
             with st.container(border=True):
@@ -329,7 +359,7 @@ if page == "📝 Daily Checklist":
                     streak_txt = f"{badge}{row['Streak']}" if row['Streak'] > 0 else ""
                     pri_emoji = row['Priority'].split()[0] if row['Priority'] else ""
                     st.markdown(
-                        f"<div style='text-align:right; padding-top:6px;'>{pri_emoji} {streak_txt}</div>",
+                        f"<div style='text-align:right; padding-top:6px; font-size: 20px;'>{pri_emoji} {streak_txt}</div>",
                         unsafe_allow_html=True,
                     )
             if checked != row['Completed']:
@@ -350,7 +380,6 @@ if page == "📝 Daily Checklist":
             new_cat = st.selectbox("Category", list(CATEGORIES.keys()))
         with c2:
             new_pri = st.selectbox("Priority", list(PRIORITIES.keys()), index=1)
-        # 'type="primary"' makes the button stand out with a solid color
         submitted = st.form_submit_button("Add to list", type="primary")
         if submitted and new_task:
             new_row = pd.DataFrame({
@@ -384,8 +413,8 @@ elif page == "📊 Analytics":
         base = alt.Chart(chart_data).encode(
             theta=alt.Theta("Count:Q", stack=True),
             color=alt.Color("Status:N",
-                             scale=alt.Scale(domain=["Completed", "Pending"], range=["#6BCB77", "#FF6B6B"]),
-                             legend=alt.Legend(title="Status")),
+                             scale=alt.Scale(domain=["Completed", "Pending"], range=["#00D4FF", "#334155"]),
+                             legend=alt.Legend(title="Status", labelColor="white", titleColor="white")),
         ).properties(height=320)
         st.altair_chart(base.mark_arc(innerRadius=60), use_container_width=True)
     else:
@@ -415,10 +444,10 @@ elif page == "📊 Analytics":
         hist["Pct"] = pd.to_numeric(hist["Pct"], errors="coerce")
         hist = hist.dropna(subset=["Date"]).sort_values("Date").tail(14)
         area = alt.Chart(hist).mark_area(
-            line={"color": "#845EC2", "size": 2},
+            line={"color": "#00D4FF", "size": 3},
             color=alt.Gradient(gradient="linear", stops=[
-                alt.GradientStop(color="white", offset=0),
-                alt.GradientStop(color="#845EC2", offset=1)], x1=1, x2=1, y1=1, y2=0),
+                alt.GradientStop(color="rgba(0, 212, 255, 0.5)", offset=0),
+                alt.GradientStop(color="rgba(0, 212, 255, 0)", offset=1)], x1=1, x2=1, y1=1, y2=0),
         ).encode(
             x=alt.X("Date:T", title=""),
             y=alt.Y("Pct:Q", title="% Complete", scale=alt.Scale(domain=[0, 100])),
@@ -458,19 +487,16 @@ elif page == "⚙️ Manage Tasks":
 
     st.divider()
     st.write("#### 🗑️ Delete Tasks")
-    # Creates a clean dropdown where you can click multiple tasks to tag them for deletion
     tasks_to_delete = st.multiselect("Select tasks to delete:", df['Task'].tolist())
 
     if st.button("Delete Selected Tasks", type="primary"):
         if tasks_to_delete:
-            # Filters the dataframe to keep only the tasks NOT in the deletion list
             df = df[~df['Task'].isin(tasks_to_delete)].reset_index(drop=True)
             persist_tasks(df, success_msg="Tasks removed successfully!")
         else:
             st.warning("Please select at least one task to delete.")
 
-
-# --- 7. Page: Reward Game (unlocked at 100% daily completion) ---
+# --- 7. Page: Reward Game ---
 elif page == "🎮 Reward Game":
     completed_count = int(df['Completed'].sum())
     total_tasks = len(df)
@@ -485,7 +511,6 @@ elif page == "🎮 Reward Game":
         st.write("Nice work finishing today's checklist. Pick a game:")
         tab1, tab2 = st.tabs(["🟩 Wordle", "🔀 Word Scramble"])
 
-        # --- Wordle ---
         with tab1:
             target = daily_word(WORDLE_WORDS)
             if st.session_state.get("wordle_target") != target:
@@ -516,7 +541,6 @@ elif page == "🎮 Reward Game":
             elif len(st.session_state.wordle_guesses) >= 6:
                 st.error(f"Out of guesses! The word was **{target}**.")
 
-        # --- Word Scramble ---
         with tab2:
             s_target = daily_word(SCRAMBLE_WORDS)
             if st.session_state.get("scramble_target") != s_target:
@@ -530,7 +554,7 @@ elif page == "🎮 Reward Game":
                 st.session_state.scramble_tries = 0
 
             st.markdown(
-                f"<h2 style='letter-spacing:6px; text-align:center;'>{st.session_state.scramble_display}</h2>",
+                f"<h2 style='letter-spacing:8px; text-align:center;'>{st.session_state.scramble_display}</h2>",
                 unsafe_allow_html=True,
             )
 
